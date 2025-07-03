@@ -1,11 +1,69 @@
 import pandas as pd
+import re
 
 # Define a constant that represents the current academic term
 CURRENT_TERM = "Fall 2025"
 
+# Reusable formatter: Capitalizes title + credential
+def format_program_name(name):
+    if not isinstance(name, str):
+        return name
+
+    # Manual replacements for known inconsistencies
+    replacements = {
+        r"\bph\.d\.\b": "Ph.D.",
+        r"\bdr\.p\.h\.\b": "Dr.P.H.",
+        r"\bed\.s\.\b": "Ed.S.",
+        r"\bm\.s\.a\.a\.\b": "M.S.A.A.",
+        r"\bm\.s\.b\.\b": "M.S.B.",
+        r"\bm\.s\.b\.e\.\b": "M.S.B.E.",
+        r"\bm\.s\.b\.c\.b\.\b": "M.S.B.C.B.",
+        r"\bm\.s\.c\.e\.\b": "M.S.C.E.",
+        r"\bm\.s\.c\.h\.\b": "M.S.C.H.",
+        r"\bb\.s\.n\b": "BSN",
+        r"\bm\.s\.n\b": "MSN",
+        r"\bpharm\.d\.\b": "Pharm.D.",
+        r"\besol\b": "ESOL",
+        r"\brotc\b": "ROTC",
+        r"\btesla\b": "TESLA",
+        r"women's": "Women's",
+        r"woment's": "Women's"
+    }
+
+    name = name.strip()
+
+    # Apply manual replacements (case-insensitive)
+    for pattern, replacement in replacements.items():
+        name = re.sub(pattern, replacement, name, flags=re.IGNORECASE)
+
+    # Handle title casing BEFORE the comma (program part only)
+    if ',' in name:
+        base, after_comma = name.split(',', 1)
+        base = base.title()
+        after_comma = after_comma.strip()
+
+        # Capitalize credential if it is short (e.g., M.A., M.S., Ph.D.)
+        # And title-case anything that comes after (e.g., concentrations)
+        parts = after_comma.split(' ', 1)
+        credential = parts[0].upper()
+        rest = parts[1].title() if len(parts) > 1 else ""
+
+        formatted = f"{base}, {credential}"
+        if rest:
+            formatted += f" {rest}"
+        return formatted
+    else:
+        return name.title()
+    
 # This function applies logic to determine the approval status of academic programs
 # It compares this year's program list to last year's to detect changes, like new or removed programs
 def apply_approval_logic(this_year_df: pd.DataFrame, last_year_df: pd.DataFrame) -> pd.DataFrame:
+    # make sure accreditation column matches last year's header
+    this_year_df.rename(columns={"Accredited": "Accredited? Yes or No"}, inplace=True)
+    this_year_df.rename(columns={
+        "Accredited": "Accredited? Yes or No",
+        "License Prep": "State License or Cert Prep?    Yes or No"
+    }, inplace=True)
 
     # ---------------------------
     # Normalize Program Names
@@ -80,6 +138,7 @@ def apply_approval_logic(this_year_df: pd.DataFrame, last_year_df: pd.DataFrame)
     # ---------------------------
     # Combine this year's processed programs with the removed programs from last year
     final_df = pd.concat([merged, removed_programs], ignore_index=True)
+    final_df["Program Name"] = final_df["Program Name"].apply(format_program_name)
 
     def assign_catalog_name(row):
         status = row["School Reported Approval Status"]
