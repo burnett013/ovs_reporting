@@ -28,7 +28,7 @@ def show():
     # === Step 3: Generate report ===
     if st.button("Generate Report"):
         if all([grad_catalog_pdf, grad_toc_pdf, ug_catalog_pdf, last_year_xlsx]):
-            with st.spinner("Hang on while greatness is made..."):
+            with st.spinner("Hang on while I cook up some awesome sauce..."):
                 # Step 1: Combine UG and GR
                 combined_df, _ = combine_catalogs(
                     grad_catalog_pdf,
