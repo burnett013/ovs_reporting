@@ -30,7 +30,8 @@ def normalize_text_case(text: str) -> str:
         r"m\.s\.b\.c\.b\.": "M.S.B.C.B.",
         r"m\.s\.c\.e\.": "M.S.C.E.",
         r"m\.s\.c\.h\.": "M.S.C.H.",
-
+        r"\bBsn\b": "BSN",
+        r"'S\b": "'s",
         r"\besol\b": "ESOL",
         r"\brotc\b": "ROTC",
         r"\btesla\b": "TESLA",
