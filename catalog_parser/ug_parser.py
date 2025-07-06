@@ -220,19 +220,6 @@ def export_to_excel(data: list, output_path: Path) -> pd.DataFrame:
 
     df.to_excel(output_path, index=False)
 
-    wb = load_workbook(output_path)
-    ws = wb.active
-    widths = {
-        1: 15, 2: 50, 3: 15, 4: 25, 5: 20, 6: 25, 7: 15, 8: 25,
-        9: 20, 10: 20, 11: 25
-    }
-    for col, width in widths.items():
-        ws.column_dimensions[get_column_letter(col)].width = width
-
-    wb.save(output_path)
-    print(f"\nExtracted {len(data)} programs")
-    return df
-
 def run_ug_parser(input_pdf: str) -> pd.DataFrame:
     program_data = extract_program_names(Path(input_pdf))
     df = pd.DataFrame(program_data)
