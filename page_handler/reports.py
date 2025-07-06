@@ -1,4 +1,4 @@
-# reports.py
+# page_handler/reports.py
 import streamlit as st
 import pandas as pd
 from catalog_parser.merge import combine_catalogs
@@ -28,7 +28,7 @@ def show():
     # === Step 3: Generate report ===
     if st.button("Generate Report"):
         if all([grad_catalog_pdf, grad_toc_pdf, ug_catalog_pdf, last_year_xlsx]):
-            with st.spinner("Hang on while I cook up some awesome sauce..."):
+            with st.spinner("On the menu today is awesome, with a side of greatness..."):
                 # Step 1: Combine UG and GR
                 combined_df, _ = combine_catalogs(
                     grad_catalog_pdf,

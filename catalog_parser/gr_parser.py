@@ -218,15 +218,6 @@ def build_records(pdf_path: Path, toc_df: pd.DataFrame) -> pd.DataFrame:
         })
     return pd.DataFrame(rows)
 
-# def apply_column_formatting(writer):
-#     ws = writer.book.active
-#     column_widths = {
-#         "A": 10, "B": 50, "C": 15, "D": 25, "E": 25, "F": 30, "G": 15,
-#         "H": 20, "I": 25, "J": 15, "K": 30, "L": 12, "M": 15, "N": 12, "O": 20
-#     }
-#     for col_letter, width in column_widths.items():
-#         ws.column_dimensions[col_letter].width = width
-
 def run_gr_parser(core_pdf: str, toc_pdf: str) -> pd.DataFrame:
     toc_df = build_toc(Path(toc_pdf))
     return build_records(Path(core_pdf), toc_df)
