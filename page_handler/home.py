@@ -1,6 +1,6 @@
 # page_handler/home.py
 import streamlit as st
-from app_params import APP_NAME, VERSION  # Optional: if you have shared constants
+from app_params import APP_NAME, VERSION
 
 def show():
     # ---- Hero Section ----------------------------

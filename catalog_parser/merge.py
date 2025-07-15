@@ -1,5 +1,4 @@
 # catalog_parser/merge.py
-
 from pathlib import Path
 import pandas as pd
 from . import gr_parser, ug_parser
