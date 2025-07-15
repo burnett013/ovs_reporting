@@ -6,7 +6,6 @@ from . import gr_parser, ug_parser
 
 def combine_catalogs(
     grad_pdf,
-    toc_pdf,
     ug_pdf,
     output_name: str = "combined_catalog.xlsx"
 ) -> tuple[pd.DataFrame, str]:
@@ -19,15 +18,13 @@ def combine_catalogs(
 
     # ---------- persist uploads ----------
     grad_path = storage_dir / "grad_catalog_upload.pdf"
-    toc_path  = storage_dir / "grad_toc_upload.pdf"
     ug_path   = storage_dir / "ug_catalog_upload.pdf"
 
     grad_path.write_bytes(grad_pdf.read())
-    toc_path.write_bytes(toc_pdf.read())
     ug_path.write_bytes(ug_pdf.read())
 
     # ---------- parse PDFs ----------
-    gr_df = gr_parser.run_gr_parser(str(grad_path), str(toc_path))
+    gr_df = gr_parser.run_gr_parser(str(grad_path))
     ug_df = ug_parser.run_ug_parser(str(ug_path))
     combined_df = pd.concat([gr_df, ug_df], ignore_index=True)
 
