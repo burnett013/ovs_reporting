@@ -1,14 +1,13 @@
 # parser/gr_parser.py
-import pdfplumber
 import pandas as pd
+import streamlit as st
 import re
 from pathlib import Path
 from PyPDF2 import PdfReader
-from pdf2image import convert_from_path
-import pytesseract
+import pdfplumber
 from openpyxl.utils import get_column_letter
 from openpyxl import load_workbook
-
+# Global Constraints
 DEGREE_SUFFIXES = [
     "M\\.S\\.", "M\\.A\\.", "Ph\\.D\\.", "M\\.F\\.A\\.", "Au\\.D\\.", "Ed\\.D\\.", "Ed\\.S\\.", "M\\.B\\.A\\.",
     "D\\.B\\.A\\.", "D\\.N\\.P\\.", "M\\.P\\.A\\.", "M\\.S\\.A\\.A\\.", "M\\.S\\.Ch\\.", "M\\.S\\.B\\.C\\.B\\.",
@@ -17,16 +16,26 @@ DEGREE_SUFFIXES = [
     "M\\.S\\.B\\.E\\.", "M\\.S\\.C\\.E\\.", "M\\.E\\.d\\.", "M\\.A\\.T\\.", "M\\.S\\.E\\.V\\.", "M\\.H\\.A\\.",
     "M\\.S\\.H\\.I\\.", "M\\.S\\.I\\.E\\.", "M\\.S\\.M\\.", "M\\.S\\.M\\.S\\.E\\.", "M\\.D\\.", "M\\.M\\.",
     "M\\.S\\.N\\.", "Pharm\\.D\\.", "D\\.P\\.T\\.", "M\\.P\\.A\\.S\\.", "Dr\\.P\\.H\\.", "M\\.S\\.P\\.H\\.",
-    "M\\.S\\.W\\.", "M\\.S\\.M\\.S\\."
+    "M\\.S\\.W\\.", "M\\.S\\.M\\.S\\.","M\\.?S\\.?", "M\\.?A\\.?", "Ph\\.?D\\.?", "M\\.?F\\.?A\\.?", "Au\\.?D\\.?", "Ed\\.?D\\.?", "Ed\\.?S\\.?", "M\\.?B\\.?A\\.?", "D\\.?B\\.?A\\.?", "D\\.?N\\.?P\\.?", "M\\.?P\\.?A\\.?", "M\\.?P\\.?H\\.?", "M\\.?E\\.?d\\.?", "M\\.?S\\.?W\\.?", "Dr\\.?P\\.?H\\.?", "Pharm\\.?D\\.?", "M\\.?S\\.?N\\.?", "M\\.?M\\.?", "M\\.?A\\.?T\\.?"
+]
+
+STOP_PHRASES = [
+    "also offered", "major shares", "concentration under", "elective", "internship", "comprehensive exam", "PHC",
+    "view requirements", "usf is", "usf administration", "graduate studies senior", "college deans", "egad",
+    "graduate majors with", "students establish a", "summer 4", "integrated learning experience", "completion",
+    "time limit", "certificate contacts", "policies", "admissions and process", "curriculum requirements",
+    "refer to", "graduate course", "president", "prasant", "assistant dean", "policy", "office of graduate",
+    "majors, concentrations", "by degree type", "chancellor", "6000", "students must", "(a -z)", 
+    "usf is a place where you can challenge yourself"
 ]
 
 DEGREE_PATTERN = "|".join(DEGREE_SUFFIXES)
-
-MAJOR_REGEX = re.compile(rf"^(.*?)\s*,?\s*({DEGREE_PATTERN})\s*\.{{3,}}\s*(\d+)$")
+MAJOR_REGEX = re.compile(rf"^([A-Z][\w\s&/-]+),\s*({DEGREE_PATTERN})\.?$", re.IGNORECASE)
 GC_REGEX = re.compile(r"([\w:()&’'\/,\-.\s]*?Graduate Certificate)\s*\.{3,}\s*(\d{3,4})")
 
-def extract_pdf_lines(pdf_toc: Path) -> list:
-    with pdfplumber.open(str(pdf_toc)) as pdf:
+# Extract raw lines from PDF
+def extract_catalog_lines(pdf_path: Path) -> list:
+    with pdfplumber.open(str(pdf_path)) as pdf:
         lines = []
         for page in pdf.pages:
             text = page.extract_text()
@@ -34,35 +43,7 @@ def extract_pdf_lines(pdf_toc: Path) -> list:
                 lines.extend(text.splitlines())
         return lines
 
-def extract_majors(toc_lines: list) -> list:
-    majors = []
-    for line in toc_lines:
-        line = line.strip()
-        match = MAJOR_REGEX.match(line)
-        if match:
-            prefix = match.group(1).strip()
-            credential = match.group(2).strip()
-            program = f"{prefix}M.S." if prefix.endswith("M.S.") and credential == "M.S." else f"{prefix}, {credential}"
-            page = int(match.group(3))
-            majors.append((program, page))
-        else:
-            continue
-    return majors
-
-def add_manual_majors(majors: list) -> list:
-    manual_entries = [
-        ("Business Administration, D.B.A.", 223),
-        ("Criminology, Ph.D.", 323),
-        ("Curriculum and Instruction, M.Ed.", 332),
-        ("Educational Leadership, M.Ed.", 374),
-        ("Social Work, M.S.W.", 720)
-    ]
-    existing_programs = set(prog for prog, _ in majors)
-    for prog, page in manual_entries:
-        if prog not in existing_programs:
-            majors.append((prog, page))
-    return majors
-
+# Fix broken wrapped lines
 def merge_wrapped_lines(lines: list) -> list:
     cleaned = []
     buffer = ""
@@ -78,35 +59,105 @@ def merge_wrapped_lines(lines: list) -> list:
         cleaned.append(buffer.strip())
     return cleaned
 
-def extract_gcs(lines: list) -> list:
-    gc_candidates = []
-    for line in lines:
-        cleaned = re.sub(r"^2024-2025 USF Graduate Catalog [xivl]+\s+", "", line)
-        if "Graduate Certificate" in cleaned:
-            gc_candidates.append(cleaned.strip())
+# Extract majors
+def extract_programs_from_catalog(pdf_path: Path) -> list:
+    reader = PdfReader(str(pdf_path))
+    programs = []
+    for i, page in enumerate(reader.pages):
+        text = page.extract_text() or ""
+        lines = text.splitlines()
+        printed_page_number = None
+        for line in reversed(lines[-40:]):
+            if re.fullmatch(r"\d{3,4}", line.strip()):
+                num = int(line.strip())
+                if 3 <= num <= 761:
+                    printed_page_number = num
+                    break
+        if not printed_page_number:
+            with pdfplumber.open(str(pdf_path)) as pdf:
+                text_lines = pdf.pages[i].extract_text().splitlines()
+                for line in reversed(text_lines[-10:]):
+                    try:
+                        num = int(line.strip())
+                        if 3 <= num <= 761:
+                            printed_page_number = num
+                            break
+                    except ValueError:
+                        continue
+        if not printed_page_number:
+            continue
+        header_block = []
+        for line in lines[:40]:
+            stripped = line.strip()
+            if stripped == "":
+                continue
+            if stripped.lower().startswith("college of "):
+                break
+            header_block.append(stripped)
+        for j in range(len(header_block)):
+            for span in range(1, 4):
+                combo = " ".join(header_block[j:j+span]).replace("•", "").strip()
+                combo_lower = combo.lower()
+                if any(phrase in combo_lower for phrase in STOP_PHRASES):
+                    continue
+                match = re.match(rf"^([A-Z].*?),\s*({DEGREE_PATTERN})\.?$", combo)
+                if match:
+                    program = f"{match.group(1).strip()}, {match.group(2).strip()}"
+                    programs.append((program, printed_page_number))
+                    break
+            else:
+                continue
+            break
+    return programs
 
+# Extract graduate certificates
+def extract_gcs(pdf_path: Path) -> list:
+    reader = PdfReader(str(pdf_path))
     gcs = []
-    for line in gc_candidates:
-        match = GC_REGEX.search(line)
-        if match:
-            program = match.group(1).strip()
-            page = int(match.group(2))
-            if page <= 981:
-                gcs.append((program, page))
+    for i, page in enumerate(reader.pages):
+        text = page.extract_text() or ""
+        lines = text.splitlines()
+        printed_page_number = None
+        for line in reversed(lines[-40:]):
+            try:
+                num = int(line.strip())
+                if 763 <= num <= 981:
+                    printed_page_number = num
+                    break
+            except ValueError:
+                continue
+        if not printed_page_number:
+            with pdfplumber.open(str(pdf_path)) as pdf:
+                text_lines = pdf.pages[i].extract_text().splitlines()
+                for line in reversed(text_lines[-10:]):
+                    try:
+                        num = int(line.strip())
+                        if 763 <= num <= 981:
+                            printed_page_number = num
+                            break
+                    except ValueError:
+                        continue
+        if not printed_page_number:
+            continue
+        found_gc = False
+        for j in range(len(lines[:30])):
+            for span in range(1, 4):
+                combo = " ".join(line.strip() for line in lines[j:j+span])
+                combo_clean = combo.replace("•", "").strip()
+                combo_lower = combo_clean.lower()
+                if any(phrase in combo_lower for phrase in STOP_PHRASES):
+                    continue
+                if (
+                    "graduate certificate" in combo_lower
+                    and combo_lower.startswith(tuple("abcdefghijklmnopqrstuvwxyz"))
+                    and 3 <= len(combo_clean.split()) <= 22
+                ):
+                    gcs.append((combo_clean, printed_page_number))
+                    found_gc = True
+                    break
+            if found_gc:
+                break
     return gcs
-
-def build_toc(pdf_toc: Path) -> pd.DataFrame:
-    toc_lines = extract_pdf_lines(pdf_toc)
-    majors = extract_majors(toc_lines)
-    majors = add_manual_majors(majors)
-    cleaned_lines = merge_wrapped_lines(toc_lines)
-    gcs = extract_gcs(cleaned_lines)
-    all_programs = majors + gcs
-    return pd.DataFrame(all_programs, columns=["Program Name", "Page Number"])
-
-def export_to_excel(programs: list, output_path: Path):
-    df = pd.DataFrame(programs, columns=["Program Name", "Page Number"])
-    df.to_excel(output_path, index=False)
 
 def modality(text):
     t = text.lower()
@@ -121,17 +172,6 @@ def has_license_prep(lines: list) -> str:
         "meets certification requirements"
     ]
     return "Yes" if any(k in text for k in keywords) else "No"
-
-def classify_credential(abbrev):
-    ab = re.sub(r"[^\w]", "", abbrev).upper()
-    if any(x in ab for x in ["PHD", "DBA", "EDD", "DRPH", "DNP", "DPT", "AUD", "PHARMD", "MD", "EDS"]):
-        return "Doctorate"
-    elif ab.startswith("M") and not ab.startswith("MD"):
-        return "Master's"
-    elif "CERT" in ab:
-        return "Graduate Certificate"
-    else:
-        return "Other"
 
 def detect_concentration(text):
     context_phrase = "major contacts, deadlines, and delivery information"
@@ -182,29 +222,38 @@ def grab_text(reader: PdfReader, page_number: int, range_len: int = 1) -> tuple[
     full_text = "\n".join(parts)
     return full_text, full_text.splitlines()
 
-def build_records(pdf_path: Path, toc_df: pd.DataFrame) -> pd.DataFrame:
-    df = toc_df.copy()
-    df = df.rename(columns={"Program Name": "Program", "Page Number": "Page Number"})
-    df["Page Number"] = df["Page Number"].astype(int)
-    reader = PdfReader(pdf_path)
+def classify_credential(abbrev: str) -> str:
+    ab = re.sub(r"[^\w]", "", abbrev).upper()
+    if any(x in ab for x in ["CERT", "GRADCERTIFICATE"]):
+        return "Grad Cert"
+    elif any(x in ab for x in ["PHD", "DBA", "EDD", "EDS", "DRPH", "DNP", "DPT", "AUD", "PHARMD", "MD"]):
+        return "Doctorate"
+    elif ab.startswith("M") and not ab.startswith("MD"):
+        return "Masters"
+    else:
+        return "Other"
+
+# Build DataFrame
+def build_program_dataframe(pdf_path: Path, programs: list[tuple[str, int]]) -> pd.DataFrame:
+    reader = PdfReader(str(pdf_path))
     rows = []
-    for program, page_number in df.itertuples(index=False):
+    for program_name, page_number in programs:
         text, lines = grab_text(reader, page_number, range_len=2)
         hours = find_hours(text)
-        credential = program.split(",")[-1].strip()
+        credential = program_name.split(",")[-1].strip()
         is_cert = "CERT" in credential.upper()
+        edu_obj = "Grad Cert" if is_cert else classify_credential(credential)
         concentration_status = "No" if is_cert else detect_concentration(text)
-        edu_obj = "Graduate Certificate" if is_cert else classify_credential(credential)
         if concentration_status == "Yes":
-            prog_type = "Concentration"
-        elif concentration_status == "No" and edu_obj in ["Master's", "Doctorate"]:
+            prog_type = "Major with Concentration"
+        elif is_cert:
+            prog_type = "Grad Cert"
+        elif edu_obj in ["Masters", "Doctorate"]:
             prog_type = "Major"
-        elif concentration_status == "No" and edu_obj == "Graduate Certificate":
-            prog_type = "Graduate Certificate"
         else:
             prog_type = "Other"
         rows.append({
-            "Program Name": program,
+            "Program Name": program_name,
             "Accredited": "No" if re.search(r"not accredited", text, flags=re.I) else "Yes",
             "Educational Objective": edu_obj,
             "Concentrations? Yes or No": concentration_status,
@@ -218,6 +267,10 @@ def build_records(pdf_path: Path, toc_df: pd.DataFrame) -> pd.DataFrame:
         })
     return pd.DataFrame(rows)
 
-def run_gr_parser(core_pdf: str, toc_pdf: str) -> pd.DataFrame:
-    toc_df = build_toc(Path(toc_pdf))
-    return build_records(Path(core_pdf), toc_df)
+# Main Function for Execution
+def run_gr_parser(core_pdf: str) -> pd.DataFrame:
+    pdf_path = Path(core_pdf)
+    majors = extract_programs_from_catalog(pdf_path)
+    gcs = extract_gcs(pdf_path)
+    all_programs = majors + gcs
+    return build_program_dataframe(pdf_path, all_programs)
