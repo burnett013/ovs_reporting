@@ -1,4 +1,4 @@
-# reports.py
+# page_handler/reports.py
 import streamlit as st
 import pandas as pd
 from catalog_parser.merge import combine_catalogs
@@ -21,18 +21,16 @@ def show():
     # === Step 2: File uploaders ===
     st.subheader("Upload Required Files")
     grad_catalog_pdf = st.file_uploader("Graduate Catalog PDF", type="pdf")
-    grad_toc_pdf = st.file_uploader("Graduate Table of Contents PDF", type="pdf")
     ug_catalog_pdf = st.file_uploader("Undergraduate Catalog PDF", type="pdf")
     last_year_xlsx = st.file_uploader("Last Year's VA Excel File (.xlsx)", type=["xlsx"])
 
     # === Step 3: Generate report ===
     if st.button("Generate Report"):
-        if all([grad_catalog_pdf, grad_toc_pdf, ug_catalog_pdf, last_year_xlsx]):
-            with st.spinner("Hang on while I cook up some awesome sauce..."):
+        if all([grad_catalog_pdf, ug_catalog_pdf, last_year_xlsx]):
+            with st.spinner("On the menu today is awesome, with a side of greatness..."):
                 # Step 1: Combine UG and GR
                 combined_df, _ = combine_catalogs(
                     grad_catalog_pdf,
-                    grad_toc_pdf,
                     ug_catalog_pdf,
                     output_name=output_filename
                 )

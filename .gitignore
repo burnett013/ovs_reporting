@@ -1,2 +1,36 @@
+# === Python cache & compiled files ===
+__pycache__/
 *.pyc
-*.pyc
+*.pyo
+*.pyd
+
+# === Virtual environments ===
+.venv/
+venv/
+env/
+
+# === Streamlit cache/config ===
+.streamlit/
+.streamlit/secrets.toml
+
+# === Local files you don’t want in Git ===
+upl_file_bunker/
+test_files/
+*.xlsx
+*.pdf
+
+# === macOS system files ===
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# === VSCode settings ===
+.vscode/
+*.code-workspace
+
+# === Logs ===
+*.log
+
+# === Other temporary files ===
+*.tmp
+*.bak
