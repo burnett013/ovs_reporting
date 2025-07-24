@@ -52,7 +52,7 @@ def show():
         )
 
     # ---- Quick Call-to-Action ---------------------------
-    st.success("Ready to get started? Head to the **“Reports”** page via the sidebar, upload your files, and click **Generate VA Report**.")
+    st.success("Ready to get started? Head to the **“Catalog Report”** page or the **Comparison Report** via the sidebar, upload your files, and click **Generate VA Report**.")
 
     # ---- Footer ------------------------------------------
     st.caption("Built from Texas with ❤️ & Streamlit · USF Office of Veteran Success · 2025")

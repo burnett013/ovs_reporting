@@ -14,9 +14,9 @@ def is_accredited(lines: list) -> str:
     ]
     return "No" if any(k in text for k in keywords) else "Yes"
 
-def get_program_pid(formatted_title: str, pid_df: pd.DataFrame) -> str:
-    match = pid_df[pid_df["Program"].str.lower().str.strip() == formatted_title.lower().strip()]
-    return match.iloc[0]["PID"] if not match.empty else ""
+# def get_program_pid(formatted_title: str, pid_df: pd.DataFrame) -> str:
+#     match = pid_df[pid_df["Program"].str.lower().str.strip() == formatted_title.lower().strip()]
+#     return match.iloc[0]["PID"] if not match.empty else ""
 
 def extract_catalog_page_number(lines: list) -> int:
     for line in reversed(lines):
@@ -189,7 +189,7 @@ def extract_program_names(pdf_path: Path) -> list:
                     accredited = is_accredited(block)
 
                     results.append({
-                        "PID": "",
+                        # "PID": "",
                         "Program Name": name,
                         "Accredited": accredited,
                         "Type": program_type,
@@ -213,9 +213,16 @@ def export_to_excel(data: list, output_path: Path) -> pd.DataFrame:
     df = pd.DataFrame(data)
     df.insert(0, "Program Name", df.pop("Program Name"))
     df = df[[
-        "Program Name", "Accredited", "Educational Objective", "Concentrations? Yes or No",
-        "Total Credit Hours in Program", "Program Length Measurement", "Full-Time Enrollment",
-        "Page Number", "License Prep", "Modality", "Type"
+        "Program Name", 
+        "Accredited", 
+        "Educational Objective", 
+        "Concentrations? Yes or No",
+        "Total Credit Hours in Program", 
+        "Program Length Measurement", 
+        "Full-Time Enrollment",
+        "Page Number", 
+        "License Prep", 
+        "Modality", "Type"
     ]]
 
     df.to_excel(output_path, index=False)
