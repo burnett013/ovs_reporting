@@ -1,6 +1,6 @@
 # app.py
 import streamlit as st
-from page_handler import home, reports
+from page_handler import home, cat_report, comp_report
 
 # Set basic config
 st.set_page_config(page_title="Entry Portal", layout="wide")
@@ -8,7 +8,8 @@ st.set_page_config(page_title="Entry Portal", layout="wide")
 # Page routing logic
 PAGES = {
     "Home": home,
-    "Reports": reports,
+    "Catalog Report": cat_report,
+    "Comparison Report": comp_report
 }
 # Sidebar Navigation
 st.sidebar.title("Navigation")
