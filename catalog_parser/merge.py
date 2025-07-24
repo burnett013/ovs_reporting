@@ -16,8 +16,8 @@ def combine_catalogs(
     storage_dir.mkdir(exist_ok=True)
 
     # ---------- persist uploads ----------
-    grad_path = storage_dir / "grad_catalog_upload.pdf"
-    ug_path   = storage_dir / "ug_catalog_upload.pdf"
+    grad_path = storage_dir / "grad_catalog_upl.pdf"
+    ug_path   = storage_dir / "ug_catalog_upl.pdf"
 
     grad_path.write_bytes(grad_pdf.read())
     ug_path.write_bytes(ug_pdf.read())

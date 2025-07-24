@@ -7,7 +7,10 @@ from PyPDF2 import PdfReader
 import pdfplumber
 from openpyxl.utils import get_column_letter
 from openpyxl import load_workbook
+
 # Global Constraints
+OFFSET = 51  # skip Roman numeral pages
+
 DEGREE_SUFFIXES = [
     "M\\.S\\.", "M\\.A\\.", "Ph\\.D\\.", "M\\.F\\.A\\.", "Au\\.D\\.", "Ed\\.D\\.", "Ed\\.S\\.", "M\\.B\\.A\\.",
     "D\\.B\\.A\\.", "D\\.N\\.P\\.", "M\\.P\\.A\\.", "M\\.S\\.A\\.A\\.", "M\\.S\\.Ch\\.", "M\\.S\\.B\\.C\\.B\\.",
@@ -61,18 +64,30 @@ def merge_wrapped_lines(lines: list) -> list:
 
 # Extract majors
 def extract_programs_from_catalog(pdf_path: Path) -> list:
+    """
+    Extract graduate programs from the catalog while skipping the Roman numeral pages.
+
+    OFFSET is used to skip the initial front matter with Roman numeral page numbering.
+    """
     reader = PdfReader(str(pdf_path))
     programs = []
-    for i, page in enumerate(reader.pages):
+
+    # Skip the first OFFSET pages (Roman numerals) and only process the numbered section
+    for i, page in enumerate(reader.pages[OFFSET:], start=OFFSET):
         text = page.extract_text() or ""
         lines = text.splitlines()
+
         printed_page_number = None
+
+        # Try to detect the printed page number from the last ~40 lines of the page
         for line in reversed(lines[-40:]):
             if re.fullmatch(r"\d{3,4}", line.strip()):
                 num = int(line.strip())
-                if 3 <= num <= 761:
+                if 3 <= num <= 761:  # valid major section page range
                     printed_page_number = num
                     break
+
+        # Fallback with pdfplumber if PyPDF2 missed it
         if not printed_page_number:
             with pdfplumber.open(str(pdf_path)) as pdf:
                 text_lines = pdf.pages[i].extract_text().splitlines()
@@ -84,8 +99,12 @@ def extract_programs_from_catalog(pdf_path: Path) -> list:
                             break
                     except ValueError:
                         continue
+
+        # If we still can’t find a printed page number, skip
         if not printed_page_number:
             continue
+
+        # Collect header block for possible program titles
         header_block = []
         for line in lines[:40]:
             stripped = line.strip()
@@ -94,38 +113,56 @@ def extract_programs_from_catalog(pdf_path: Path) -> list:
             if stripped.lower().startswith("college of "):
                 break
             header_block.append(stripped)
+
+        # Look for valid program title + degree suffix
         for j in range(len(header_block)):
-            for span in range(1, 4):
+            for span in range(1, 4):  # check 1-line, 2-line, or 3-line combos
                 combo = " ".join(header_block[j:j+span]).replace("•", "").strip()
                 combo_lower = combo.lower()
                 if any(phrase in combo_lower for phrase in STOP_PHRASES):
                     continue
+
                 match = re.match(rf"^([A-Z].*?),\s*({DEGREE_PATTERN})\.?$", combo)
                 if match:
                     program = f"{match.group(1).strip()}, {match.group(2).strip()}"
                     programs.append((program, printed_page_number))
                     break
             else:
+                # continue outer loop if inner didn't break
                 continue
+            # break outer loop if we found a match
             break
+
     return programs
 
 # Extract graduate certificates
 def extract_gcs(pdf_path: Path) -> list:
+    """
+    Extract graduate certificates from the catalog while skipping the Roman numeral pages.
+
+    OFFSET is used to skip the initial front matter with Roman numeral page numbering.
+    """
     reader = PdfReader(str(pdf_path))
     gcs = []
-    for i, page in enumerate(reader.pages):
+
+    # Skip the first OFFSET pages (Roman numerals) and only process the numbered section
+    for i, page in enumerate(reader.pages[OFFSET:], start=OFFSET):
         text = page.extract_text() or ""
         lines = text.splitlines()
+
         printed_page_number = None
+
+        # Try to detect the printed page number from the last ~40 lines of the page
         for line in reversed(lines[-40:]):
             try:
                 num = int(line.strip())
-                if 763 <= num <= 981:
+                if 763 <= num <= 981:  # valid Graduate Certificate section page range
                     printed_page_number = num
                     break
             except ValueError:
                 continue
+
+        # Fallback with pdfplumber if PyPDF2 missed it
         if not printed_page_number:
             with pdfplumber.open(str(pdf_path)) as pdf:
                 text_lines = pdf.pages[i].extract_text().splitlines()
@@ -137,16 +174,24 @@ def extract_gcs(pdf_path: Path) -> list:
                             break
                     except ValueError:
                         continue
+
+        # If we still can’t find a printed page number, skip
         if not printed_page_number:
             continue
+
+        # Look for Graduate Certificate titles near the top of the page
         found_gc = False
-        for j in range(len(lines[:30])):
-            for span in range(1, 4):
+        for j in range(len(lines[:30])):  # scan first ~30 lines for GC titles
+            for span in range(1, 4):  # check 1-line, 2-line, or 3-line combos
                 combo = " ".join(line.strip() for line in lines[j:j+span])
                 combo_clean = combo.replace("•", "").strip()
                 combo_lower = combo_clean.lower()
+
+                # Skip lines with known stop phrases
                 if any(phrase in combo_lower for phrase in STOP_PHRASES):
                     continue
+
+                # Check if it's a Graduate Certificate title
                 if (
                     "graduate certificate" in combo_lower
                     and combo_lower.startswith(tuple("abcdefghijklmnopqrstuvwxyz"))
@@ -155,10 +200,11 @@ def extract_gcs(pdf_path: Path) -> list:
                     gcs.append((combo_clean, printed_page_number))
                     found_gc = True
                     break
+
             if found_gc:
                 break
-    return gcs
 
+    return gcs
 def modality(text):
     t = text.lower()
     return "Online" if "online" in t else "Hybrid" if "hybrid" in t else "Campus"
@@ -266,6 +312,7 @@ def build_program_dataframe(pdf_path: Path, programs: list[tuple[str, int]]) -> 
             "Type": prog_type,
         })
     return pd.DataFrame(rows)
+
 
 # Main Function for Execution
 def run_gr_parser(core_pdf: str) -> pd.DataFrame:
