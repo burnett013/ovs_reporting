@@ -1,4 +1,7 @@
 # app_params.py
+'''
+Set global parameters
+'''
 APP_NAME = "Home"
 VERSION = "1.0"
 # app_params.py

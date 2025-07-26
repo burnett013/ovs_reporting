@@ -1,4 +1,7 @@
 # app.py
+'''
+Main entry point for Streamlit
+'''
 import streamlit as st
 from page_handler import home, cat_report, comp_report
 

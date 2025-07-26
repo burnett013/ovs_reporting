@@ -183,7 +183,7 @@ def extract_program_names(pdf_path: Path) -> list:
                         "Minor": extract_minor_credit_hours
                     }.get(program_type, lambda _: None)(block)
 
-                    edu = {"Major": "Bachelor's", "Minor": "Bachelor's", "Concentration": "Bachelor's", "Certificate": "Certificate"}.get(program_type, "Unknown")
+                    edu = {"Major": "Bachelor", "Minor": "Bachelor", "Concentration": "Bachelor", "Certificate": "Certificate"}.get(program_type, "Unknown")
                     modality = extract_modality_from_lines(lines[j+1 : j+20])
                     license_prep = has_license_prep(block)
                     accredited = is_accredited(block)
