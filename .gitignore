@@ -33,4 +33,4 @@ test_files/
 
 # === Other temporary files ===
 *.tmp
-*.bak
+*.bak*.pyc
