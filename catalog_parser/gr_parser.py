@@ -220,13 +220,22 @@ def has_license_prep(lines: list) -> str:
     return "Yes" if any(k in text for k in keywords) else "No"
 
 def detect_concentration(text):
-    context_phrase = "major contacts, deadlines, and delivery information"
-    concentration_phrase = "concentration"
     text_lower = text.lower()
-    if context_phrase in text_lower:
-        context_index = text_lower.find(context_phrase)
-        concentration_index = text_lower.find(concentration_phrase, context_index + 1)
-        return "Yes" if concentration_index != -1 else "No"
+
+    # Look for explicit concentration headings
+    if re.search(r"^concentration[s]?:", text_lower, re.MULTILINE):
+        return "Yes"
+    if "students may choose one of the following concentrations" in text_lower:
+        return "Yes"
+
+    # OPTIONAL: only consider it if there are multiple bullet points after "Concentrations"
+    conc_section = re.search(r"concentration[s]?:([\s\S]{0,300})", text_lower)
+    if conc_section:
+        # If there are at least 2 bullet points in the section, assume real concentrations
+        bullets = re.findall(r"[-•]\s*[a-z]", conc_section.group(1))
+        if len(bullets) >= 2:
+            return "Yes"
+
     return "No"
 
 def get_hour_patterns() -> list[str]:
