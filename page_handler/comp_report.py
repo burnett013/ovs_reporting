@@ -50,8 +50,8 @@ def show():
     st.subheader("Upload Two Reports to Compare")
     st.caption("Upload two previously generated catalog reports (XLSX) to see what was added, removed, or changed.")
 
-    report_old = st.file_uploader("📂 Upload Previous Year Report", type=["xlsx"], key="old_report")
-    report_new = st.file_uploader("📂 Upload Current Year Report", type=["xlsx"], key="new_report")
+    report_old = st.file_uploader("Upload Report :one:", type=["xlsx"], key="old_report")
+    report_new = st.file_uploader("Upload Report :two:", type=["xlsx"], key="new_report")
 
     if st.button("Compare Reports"):
         if report_old and report_new:
@@ -64,12 +64,12 @@ def show():
                 added, removed, changed = compare_reports(df_old, df_new)
 
                 # Show results
-                st.success("✅ Comparison Complete!")
+                st.success("Comparison Complete!")
 
-                st.write("### ✅ Added Programs")
+                st.write("### :heavy_plus_sign: Added Programs")
                 st.dataframe(added if not added.empty else pd.DataFrame({"Result": ["No new programs"]}))
 
-                st.write("### ❌ Removed Programs")
+                st.write("### :heavy_minus_sign: Removed Programs")
                 st.dataframe(removed if not removed.empty else pd.DataFrame({"Result": ["No removed programs"]}))
 
                 st.write("### 🔄 Changed Programs")
