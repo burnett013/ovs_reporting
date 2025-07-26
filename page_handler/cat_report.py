@@ -33,7 +33,7 @@ def show():
                     output_name=output_filename
                 )
 
-                st.success("✅ Catalog Report generated successfully!")
+                st.success("Catalog Report generated successfully!")
 
                 with open(combined_path, "rb") as f:
                     st.download_button("Download Catalog Report", f, file_name=output_filename)
