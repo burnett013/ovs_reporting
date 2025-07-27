@@ -74,18 +74,49 @@ def show():
     report_old = st.file_uploader("Upload Report :one:", type=["xlsx"], key="old_report")
     report_new = st.file_uploader("Upload Report :two:", type=["xlsx"], key="new_report")
 
+    # === Ask for sheet name ===
+    sheet_name = st.text_input(
+        "Enter the **sheet name** where the data is located",
+        value="Sheet1"  # default
+    )
+
+    # === Ask for first row number ===
+    first_row_number = st.number_input(
+        "Enter the **row number where data begins**",
+        min_value=1,
+        value=5,  # default row number
+        step=1
+    )
+
+    # Calculate how many rows to skip for pd.read_excel
+    skiprows_count = first_row_number - 1 if first_row_number > 1 else 0
+
+
     if st.button("Compare Reports"):
         if report_old and report_new:
             with st.spinner("Comparing reports..."):
-                # Load dataframes
-                df_old = pd.read_excel(report_old)
-                df_new = pd.read_excel(report_new)
 
-                # Compare
+                # ✅ Load dataframes using user-defined sheet + skiprows
+                try:
+                    df_old = pd.read_excel(
+                        report_old,
+                        sheet_name=sheet_name,
+                        skiprows=skiprows_count
+                    )
+                    df_new = pd.read_excel(
+                        report_new,
+                        sheet_name=sheet_name,
+                        skiprows=skiprows_count
+                    )
+                except Exception as e:
+                    st.error(f"❌ Error reading Excel files: {e}")
+                    return
+
+                # ✅ Compare
                 added, removed, changed = compare_reports(df_old, df_new)
 
-                # Show results
-                st.success("Comparison Complete!")
+                # ✅ Show results
+                st.success("✅ Comparison Complete!")
 
                 st.write("### :heavy_plus_sign: Added Programs")
                 st.dataframe(added if not added.empty else pd.DataFrame({"Result": ["No new programs"]}))
@@ -98,6 +129,5 @@ def show():
                     st.write(changed)
                 else:
                     st.info("No changed programs detected.")
-
         else:
-            st.warning("Please upload **both reports** to run the comparison.")
+            st.warning("⚠️ Please upload **both reports** to run the comparison.")
