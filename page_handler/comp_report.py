@@ -1,11 +1,29 @@
-# comparison.py (v2)
+# comparison.py
 import streamlit as st
 import pandas as pd
+import re
 
+def clean_program_names(df, col):
+    """
+    Clean program names by:
+    - Removing extra spaces around dashes
+    - Ensuring standard credentials have trailing periods
+    """
+    df[col] = df[col].astype(str).apply(lambda x: re.sub(r'\s*-\s*', '-', x.strip()))
+
+    # Add trailing periods to credentials if missing
+    credentials = [
+        "M.S", "M.A", "B.S", "B.A", "Ph.D", "Ed.D", "Ed.S", "M.F.A", "D.B.A", "D.N.P", 
+        "M.P.A", "M.B.A", "Au.D", "M.S.B", "M.S.C.S", "M.S.B.E", "M.S.C.P", "M.S.E.M"
+    ]
+
+    for cred in credentials:
+        df[col] = df[col].str.replace(rf'\b{cred}(?!\.)\b', f"{cred}.", regex=True)
 
 def find_program_column(columns):
     for col in columns:
-        if "program" in col.lower() and "name" in col.lower():
+        col_str = str(col).strip()
+        if "program" in col_str.lower() and "name" in col_str.lower():
             return col
     return None
 
@@ -17,14 +35,20 @@ def compare_reports(df_old: pd.DataFrame, df_new: pd.DataFrame):
       - Changed programs (same program but different attributes)
     """
 
-    # ✅ Try to find the right key column in both files
+    # Detect key columns
     col_old = find_program_column(df_old.columns)
     col_new = find_program_column(df_new.columns)
 
+    # Clean names before comparing
+    if col_old:
+        clean_program_names(df_old, col_old)
+    if col_new:
+        clean_program_names(df_new, col_new)
+
     # ✅ Debug info: show what columns were found
-    st.write("Detected columns in OLD report:", list(df_old.columns))
-    st.write("Detected columns in NEW report:", list(df_new.columns))
-    st.write("Auto-detected key columns:", col_old, col_new)
+    # st.write("Detected columns in report 1:", list(df_old.columns))
+    # st.write("Detected columns in report 2:", list(df_new.columns))
+    # st.write("Auto-detected key columns:", col_old, col_new)
 
     # ✅ Handle case where the column isn't found
     if not col_old or not col_new:
@@ -77,12 +101,12 @@ def show():
     # === Ask for sheet name ===
     sheet_name = st.text_input(
         "Enter the **sheet name** where the data is located",
-        value="Sheet1"  # default
+        value="PROGRAM SHEET"  # default
     )
 
     # === Ask for first row number ===
     first_row_number = st.number_input(
-        "Enter the **row number where data begins**",
+        "Enter the **header row number**",
         min_value=1,
         value=5,  # default row number
         step=1
@@ -96,7 +120,7 @@ def show():
         if report_old and report_new:
             with st.spinner("Comparing reports..."):
 
-                # ✅ Load dataframes using user-defined sheet + skiprows
+                # Load dataframes using user-defined sheet + skiprows
                 try:
                     df_old = pd.read_excel(
                         report_old,
@@ -112,11 +136,11 @@ def show():
                     st.error(f"❌ Error reading Excel files: {e}")
                     return
 
-                # ✅ Compare
+                # Compare
                 added, removed, changed = compare_reports(df_old, df_new)
 
-                # ✅ Show results
-                st.success("✅ Comparison Complete!")
+                # Show results
+                st.success("Comparison Complete!")
 
                 st.write("### :heavy_plus_sign: Added Programs")
                 st.dataframe(added if not added.empty else pd.DataFrame({"Result": ["No new programs"]}))
