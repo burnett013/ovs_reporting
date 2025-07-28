@@ -32,6 +32,16 @@ STOP_PHRASES = [
     "usf is a place where you can challenge yourself"
 ]
 
+# Manual string corrections (case-sensitive)
+REPLACEMENTS = {
+    "Asl": "ASL",
+    "Ai": "AI",
+    "EsOl": "ESOL",
+    "Rotc": "ROTC",
+    "With": "with",
+    "Graduate Certificate": "Grad Certificate",
+}
+
 DEGREE_PATTERN = "|".join(DEGREE_SUFFIXES)
 MAJOR_REGEX = re.compile(rf"^([A-Z][\w\s&/-]+),\s*({DEGREE_PATTERN})\.?$", re.IGNORECASE)
 GC_REGEX = re.compile(r"([\w:()&’'\/,\-.\s]*?Graduate Certificate)\s*\.{3,}\s*(\d{3,4})")
@@ -45,6 +55,20 @@ def extract_catalog_lines(pdf_path: Path) -> list:
             if text:
                 lines.extend(text.splitlines())
         return lines
+    
+def normalize_program_name(name: str) -> str:
+    for wrong, correct in REPLACEMENTS.items():
+        name = name.replace(wrong, correct)
+    # Also normalize spacing around dashes
+    name = name.replace(" -", "-").replace("- ", "-")  # handles leading/trailing dash spaces
+    # Fix trailing periods in credentials if missing
+    if "," in name:
+        parts = name.split(",")
+        credential = parts[-1].strip()
+        if credential and not credential.endswith("."):
+            parts[-1] = credential + "."
+            name = ", ".join(parts)
+    return name
 
 # Fix broken wrapped lines
 def merge_wrapped_lines(lines: list) -> list:
@@ -124,7 +148,8 @@ def extract_programs_from_catalog(pdf_path: Path) -> list:
 
                 match = re.match(rf"^([A-Z].*?),\s*({DEGREE_PATTERN})\.?$", combo)
                 if match:
-                    program = f"{match.group(1).strip()}, {match.group(2).strip()}"
+                    raw_program = f"{match.group(1).strip()}, {match.group(2).strip()}"
+                    program = normalize_program_name(raw_program)
                     programs.append((program, printed_page_number))
                     break
             else:
@@ -293,6 +318,7 @@ def build_program_dataframe(pdf_path: Path, programs: list[tuple[str, int]]) -> 
     reader = PdfReader(str(pdf_path))
     rows = []
     for program_name, page_number in programs:
+        program_name = normalize_program_name(program_name)
         text, lines = grab_text(reader, page_number, range_len=2)
         hours = find_hours(text)
         credential = program_name.split(",")[-1].strip()
